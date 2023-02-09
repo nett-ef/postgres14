@@ -1,0 +1,87 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:14.4
+    environment:
+      - POSTGRES_DB=${DB_ROOT_DATABASE}
+      - POSTGRES_USER=${DB_ROOT_USER}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      - PGDATA=/var/lib/postgresql/pgdata
+      - POSTGRES_INITDB_WALDIR=/var/lib/postgresql/waldir/pg_wal
+    secrets:
+      - source: ca
+        target: /run/secrets/ca.crt
+      - source: postgres14-crt
+        target: /run/secrets/postgres.crt
+      - source: postgres14-privkey
+        target: /run/secrets/postgres.key
+        uid: '999'
+        gid: '999'
+        mode: 0400
+      - source: postgres14-password
+        target: /run/secrets/postgres_password
+        uid: '999'
+        gid: '999'
+        mode: 0400
+    configs:
+      - source: postgresql_conf
+        target: /var/lib/postgresql/postgresql.conf
+        uid: '999'
+        gid: '999'
+        mode: 0400
+      - source: pg_hba_conf
+        target: /var/lib/postgresql/pg_hba.conf
+        uid: '999'
+        gid: '999'
+        mode: 0400
+    volumes:
+      - pgdata:/var/lib/postgresql/pgdata
+      - waldir:/var/lib/postgresql/waldir
+      - tmp:/tmp
+    ports:
+      - '5432:5432'
+    command:
+      - '-c'
+      - 'config_file=/var/lib/postgresql/postgresql.conf'
+      - '-c'
+      - 'hba_file=/var/lib/postgresql/pg_hba.conf'
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 2
+        window: 120s
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 614.4M
+    networks:
+      postgres:
+        aliases:
+          - postgres14
+    labels:
+      app: postgres14
+secrets:
+  ca:
+    external: true
+  postgres14-crt:
+    external: true
+  postgres14-privkey:
+    external: true
+  postgres14-password:
+    external: true
+volumes:
+  pgdata:
+  waldir:
+  tmp:
+configs:
+  postgresql_conf:
+    file: ./postgresql.conf
+  pg_hba_conf:
+    file: ./pg_hba.conf
+networks:
+  postgres:
+    driver: overlay
+    attachable: true
